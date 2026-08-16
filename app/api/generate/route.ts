@@ -3,6 +3,23 @@
 // Uses COST LAW: free models first via Javari AI engine
 // Created: May 15, 2026
 import { NextRequest, NextResponse } from 'next/server'
+
+async function callGemini(text: string): Promise<string> {
+  const key = process.env.GOOGLE_GEMINI_API_KEY ?? process.env.GEMINI_API_KEY ?? ''
+  if (!key) return ''
+  try {
+    const res = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key=${key}`,
+      { method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ contents: [{ role: 'user', parts: [{ text }] }],
+          generationConfig: { maxOutputTokens: 2048, temperature: 0.7 } }) },
+    )
+    if (!res.ok) return ''
+    const d = (await res.json()) as { candidates?: { content?: { parts?: { text?: string }[] } }[] }
+    return d.candidates?.[0]?.content?.parts?.[0]?.text ?? ''
+  } catch { return '' }
+}
+
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
 export const maxDuration = 60
@@ -106,6 +123,14 @@ export async function POST(req: NextRequest) {
           const result = data.choices?.[0]?.message?.content ?? ''
           return NextResponse.json({ result, action: body.action, model: 'groq-llama-free', cost_usd: '$0.00', credits_used: CREDIT_COST })
         }
+      }
+      // 2026-08-15: Gemini was absent from the cascade, so a Groq 429 became a
+      // customer-facing error. Free tier two of the COST LAW.
+      const gem = await callGemini(SYSTEM_PROMPT + '
+
+' + objective)
+      if (gem.length > 20) {
+        return NextResponse.json({ result: gem, action: body.action, model: 'gemini-flash-free', cost_usd: '$0.00' })
       }
       return NextResponse.json({ error: 'AI service not configured' }, { status: 503 })
     }
