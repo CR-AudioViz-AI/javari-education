@@ -126,9 +126,7 @@ export async function POST(req: NextRequest) {
       }
       // 2026-08-15: Gemini was absent from the cascade, so a Groq 429 became a
       // customer-facing error. Free tier two of the COST LAW.
-      const gem = await callGemini(SYSTEM_PROMPT + '
-
-' + objective)
+      const gem = await callGemini(SYSTEM_PROMPT + String.fromCharCode(10,10) + objective)
       if (gem.length > 20) {
         return NextResponse.json({ result: gem, action: body.action, model: 'gemini-flash-free', cost_usd: '$0.00' })
       }
